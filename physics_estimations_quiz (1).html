@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Physics Estimations — Active Recall Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #12151b;
+    --surface2: #1a1e27;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.15);
+    --text: #f0ece4;
+    --text-muted: #7a8090;
+    --text-dim: #4a5060;
+    --accent: #c8f53a;
+    --accent-dim: rgba(200,245,58,0.12);
+    --accent-glow: rgba(200,245,58,0.25);
+    --correct: #3affa0;
+    --correct-bg: rgba(58,255,160,0.08);
+    --correct-border: rgba(58,255,160,0.3);
+    --wrong: #ff6b6b;
+    --wrong-bg: rgba(255,107,107,0.08);
+    --wrong-border: rgba(255,107,107,0.3);
+    --reveal: #7eb8ff;
+    --reveal-bg: rgba(126,184,255,0.08);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px 60px;
+    position: relative;
+    overflow-x: hidden;
+  }
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image: linear-gradient(rgba(200,245,58,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(200,245,58,0.03) 1px,transparent 1px);
+    background-size:60px 60px;
+    pointer-events:none; z-index:0;
+  }
+  body::after {
+    content:'';
+    position:fixed; top:-200px; right:-200px;
+    width:600px; height:600px;
+    background:radial-gradient(circle,rgba(200,245,58,0.06) 0%,transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+  .container { width:100%; max-width:680px; position:relative; z-index:1; }
+
+  header { margin-bottom:40px; animation:fadeDown 0.6s ease both; }
+  .label {
+    font-family:'DM Mono',monospace; font-size:11px; letter-spacing:0.15em;
+    text-transform:uppercase; color:var(--accent); margin-bottom:12px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .label::before { content:''; display:inline-block; width:20px; height:1px; background:var(--accent); }
+  h1 { font-family:'DM Serif Display',serif; font-size:clamp(32px,6vw,52px); font-weight:400; line-height:1.1; margin-bottom:10px; }
+  h1 em { font-style:italic; color:var(--text-muted); }
+  .subtitle { font-size:14px; color:var(--text-muted); font-weight:300; }
+
+  .stats-bar { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:24px; animation:fadeUp 0.6s 0.1s ease both; }
+  .stat { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px; text-align:center; }
+  .stat-value { font-family:'DM Mono',monospace; font-size:24px; font-weight:500; line-height:1; margin-bottom:4px; }
+  .stat-label { font-size:10px; color:var(--text-muted); letter-spacing:0.06em; text-transform:uppercase; font-family:'DM Mono',monospace; }
+  #stat-progress .stat-value { color:var(--text); }
+  #stat-correct .stat-value { color:var(--correct); }
+  #stat-wrong .stat-value { color:var(--wrong); }
+
+  .progress-track { height:2px; background:var(--border); border-radius:2px; margin-bottom:24px; overflow:hidden; animation:fadeUp 0.6s 0.15s ease both; }
+  .progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width 0.5s cubic-bezier(0.4,0,0.2,1); box-shadow:0 0 8px var(--accent-glow); }
+
+  .card {
+    background:var(--surface); border:1px solid var(--border); border-radius:20px;
+    padding:36px 40px 32px; margin-bottom:16px;
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    position:relative; overflow:hidden;
+    animation:fadeUp 0.6s 0.2s ease both;
+    transition:border-color 0.4s;
+  }
+  .card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:1px;
+    background:linear-gradient(90deg,transparent,rgba(200,245,58,0.3),transparent);
+    opacity:0; transition:opacity 0.4s;
+  }
+  .card.state-correct { border-color:var(--correct-border); }
+  .card.state-correct::before { opacity:1; background:linear-gradient(90deg,transparent,rgba(58,255,160,0.4),transparent); }
+  .card.state-wrong { border-color:var(--wrong-border); }
+  .card.state-wrong::before { opacity:1; background:linear-gradient(90deg,transparent,rgba(255,107,107,0.4),transparent); }
+
+  .card-tag { font-family:'DM Mono',monospace; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-dim); margin-bottom:20px; }
+  .question-text { font-family:'DM Serif Display',serif; font-size:clamp(20px,4vw,26px); font-weight:400; line-height:1.3; color:var(--text); margin-bottom:28px; }
+
+  .input-wrap { width:100%; display:flex; gap:10px; }
+  .answer-input {
+    flex:1; background:var(--surface2); border:1px solid var(--border2); border-radius:12px;
+    padding:14px 18px; font-family:'DM Mono',monospace; font-size:16px; color:var(--text);
+    outline:none; transition:border-color 0.2s, box-shadow 0.2s; caret-color:var(--accent);
+  }
+  .answer-input::placeholder { color:var(--text-dim); }
+  .answer-input:focus { border-color:rgba(200,245,58,0.4); box-shadow:0 0 0 3px rgba(200,245,58,0.08); }
+  .answer-input:disabled { opacity:0.6; cursor:not-allowed; }
+
+  .btn-submit {
+    padding:14px 22px; background:var(--accent-dim); border:1px solid var(--accent);
+    border-radius:12px; color:var(--accent); font-family:'DM Sans',sans-serif;
+    font-size:15px; font-weight:500; cursor:pointer; transition:all 0.2s;
+    white-space:nowrap; display:flex; align-items:center; gap:8px;
+  }
+  .btn-submit:hover { background:var(--accent); color:var(--bg); box-shadow:0 6px 20px var(--accent-glow); }
+  .btn-submit:active { transform:scale(0.97); }
+  .btn-submit:disabled { opacity:0.4; cursor:not-allowed; }
+
+  .hint-toggle {
+    font-size:12px; color:var(--text-dim); cursor:pointer; margin-top:10px;
+    text-decoration:underline; text-underline-offset:3px;
+    font-family:'DM Mono',monospace; letter-spacing:0.04em;
+    background:none; border:none; transition:color 0.2s; align-self:center;
+  }
+  .hint-toggle:hover { color:var(--text-muted); }
+  .hint-text { font-size:12px; color:var(--text-dim); font-style:italic; margin-top:8px; display:none; }
+  .hint-text.visible { display:block; }
+
+  .result-area { width:100%; margin-top:20px; display:none; animation:popIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both; }
+  .result-area.visible { display:block; }
+
+  .result-banner {
+    padding:14px 20px; border-radius:12px; font-family:'DM Mono',monospace;
+    font-size:13px; font-weight:500; letter-spacing:0.04em; margin-bottom:12px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .result-banner.correct { background:var(--correct-bg); border:1px solid var(--correct-border); color:var(--correct); }
+  .result-banner.wrong   { background:var(--wrong-bg);   border:1px solid var(--wrong-border);   color:var(--wrong); }
+
+  .your-answer-row {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 18px; background:var(--wrong-bg);
+    border:1px solid var(--wrong-border); border-radius:10px;
+    font-size:13px; margin-bottom:8px;
+  }
+  .correct-answer-row {
+    display:flex; align-items:center; gap:10px;
+    padding:14px 18px; background:var(--reveal-bg);
+    border:1px solid rgba(126,184,255,0.2); border-radius:12px; font-size:13px;
+  }
+  .answer-label { font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.1em; font-family:'DM Mono',monospace; white-space:nowrap; }
+  .your-answer-value { font-family:'DM Mono',monospace; font-size:14px; color:var(--wrong); text-decoration:line-through; }
+  .correct-answer-value { font-family:'DM Mono',monospace; font-size:18px; font-weight:500; color:var(--reveal); }
+
+  .action-row { display:flex; gap:12px; animation:fadeUp 0.6s 0.25s ease both; }
+  .btn {
+    flex:1; padding:15px 20px; border-radius:14px; font-family:'DM Sans',sans-serif;
+    font-size:15px; font-weight:500; cursor:pointer;
+    border:1px solid var(--border); background:var(--surface); color:var(--text-muted);
+    transition:all 0.2s ease; display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .btn:hover { transform:translateY(-2px); background:var(--surface2); }
+  .btn:active { transform:scale(0.98); }
+  .btn-next { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); display:none; }
+  .btn-next:hover { background:var(--accent); color:var(--bg); box-shadow:0 8px 24px var(--accent-glow); }
+  .btn-next.visible { display:flex; }
+  .btn-skip { flex:0; padding:15px 18px; font-size:14px; color:var(--text-dim); border-color:transparent; }
+  .btn-skip:hover { color:var(--text-muted); border-color:var(--border); }
+
+  .final-screen { display:none; flex-direction:column; align-items:center; text-align:center; animation:fadeUp 0.6s ease both; }
+  .final-screen.active { display:flex; }
+  .final-score { font-family:'DM Mono',monospace; font-size:80px; font-weight:500; line-height:1; margin-bottom:12px; color:var(--accent); }
+  .final-label { font-size:14px; color:var(--text-muted); margin-bottom:8px; }
+  .final-message { font-family:'DM Serif Display',serif; font-size:26px; color:var(--text); margin-bottom:40px; font-style:italic; }
+  .btn-restart {
+    padding:16px 40px; background:var(--accent-dim); border:1px solid var(--accent);
+    color:var(--accent); border-radius:14px; font-size:15px; font-family:'DM Sans',sans-serif;
+    font-weight:500; cursor:pointer; transition:all 0.2s;
+  }
+  .btn-restart:hover { background:var(--accent); color:var(--bg); box-shadow:0 8px 28px var(--accent-glow); transform:translateY(-2px); }
+
+  .missed-list { width:100%; margin-top:32px; text-align:left; }
+  .missed-title { font-family:'DM Mono',monospace; font-size:11px; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-dim); margin-bottom:12px; }
+  .missed-item { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:16px; }
+  .missed-q { font-size:13px; color:var(--text-muted); }
+  .missed-a { font-family:'DM Mono',monospace; font-size:13px; color:var(--reveal); white-space:nowrap; }
+
+  @keyframes fadeDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes fadeUp   { from{opacity:0;transform:translateY(16px)}  to{opacity:1;transform:translateY(0)} }
+  @keyframes popIn    { from{opacity:0;transform:scale(0.92)}       to{opacity:1;transform:scale(1)} }
+  @keyframes shake    { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+  @keyframes cardSwap { 0%{opacity:1;transform:translateX(0)} 40%{opacity:0;transform:translateX(-30px)} 60%{opacity:0;transform:translateX(30px)} 100%{opacity:1;transform:translateX(0)} }
+  .card.animating { animation:cardSwap 0.45s ease both; }
+  .shake { animation:shake 0.4s ease both; }
+
+  @media(max-width:480px) {
+    .card { padding:24px 18px 20px; }
+    .input-wrap { flex-direction:column; }
+    .btn-submit { justify-content:center; }
+    .missed-item { flex-direction:column; align-items:flex-start; gap:4px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="label">AS Level Physics 9702</div>
+    <h1>Estimations<br><em>Active Recall</em></h1>
+    <p class="subtitle">30 questions · Cambridge exams 2004–2024 · Compiled by Alpha Learning</p>
+  </header>
+
+  <div id="quiz-section">
+    <div class="stats-bar">
+      <div class="stat" id="stat-progress"><div class="stat-value" id="val-progress">1/30</div><div class="stat-label">Question</div></div>
+      <div class="stat" id="stat-correct"><div class="stat-value" id="val-correct">0</div><div class="stat-label">Correct</div></div>
+      <div class="stat" id="stat-wrong"><div class="stat-value" id="val-wrong">0</div><div class="stat-label">Missed</div></div>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+
+    <div class="card" id="card">
+      <div class="card-tag" id="card-tag">Estimation #1</div>
+      <div class="question-text" id="question-text">Loading...</div>
+      <div class="input-wrap">
+        <input class="answer-input" id="answer-input" type="text" placeholder="Type your answer…" autocomplete="off" autocorrect="off" spellcheck="false"/>
+        <button class="btn-submit" id="btn-submit" onclick="checkAnswer()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Check
+        </button>
+      </div>
+      <button class="hint-toggle" id="hint-toggle" onclick="toggleHint()">show hint</button>
+      <div class="hint-text" id="hint-text"></div>
+      <div class="result-area" id="result-area">
+        <div class="result-banner" id="result-banner"></div>
+        <div class="your-answer-row" id="your-answer-row" style="display:none">
+          <span class="answer-label">Your answer</span>
+          <span class="your-answer-value" id="your-val"></span>
+        </div>
+        <div class="correct-answer-row" id="correct-row" style="display:none">
+          <span class="answer-label">Correct answer</span>
+          <span class="correct-answer-value" id="correct-val"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-row">
+      <button class="btn btn-next" id="btn-next" onclick="nextCard()">
+        Next
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="btn btn-skip" id="btn-skip" onclick="skipCard()">Skip →</button>
+    </div>
+  </div>
+
+  <div class="final-screen" id="final-screen">
+    <div class="final-score" id="final-pct">0%</div>
+    <div class="final-label" id="final-tally"></div>
+    <div class="final-message" id="final-message"></div>
+    <button class="btn-restart" onclick="restart()">Shuffle &amp; Go Again</button>
+    <div class="missed-list" id="missed-list"></div>
+  </div>
+</div>
+
+<script>
+const cards = [
+  { q:"Speed of a container ship",                              a:"10 m/s",            match:["10"],                                                    hint:"Think: a slow vehicle on water" },
+  { q:"Speed of a racing car",                                  a:"90 m/s",            match:["90"],                                                    hint:"Much faster than motorway speeds" },
+  { q:"Speed of a snail",                                       a:"2.8 × 10⁻³ m/s",   match:["2.8e-3","0.0028","2.8x10-3","2.8*10-3"],                hint:"Standard form: 2.8 × 10⁻? m/s" },
+  { q:"Diameter of a paper clip",                               a:"1 mm",              match:["1"],                                                     hint:"About the width of a thin wire" },
+  { q:"Wavelength range of visible light",                      a:"400 – 700 nm",      match:["400","700","400-700","400to700"],                        hint:"Violet to red, in nanometres" },
+  { q:"Wavelength of ultraviolet light",                        a:"10 nm",             match:["10"],                                                    hint:"Just below visible violet" },
+  { q:"Density of sand",                                        a:"2000 kg/m³",        match:["2000","2x103","2e3"],                                    hint:"About twice the density of water" },
+  { q:"Density of water",                                       a:"1000 kg/m³",        match:["1000","1x103","1e3"],                                    hint:"The reference: 1 g/cm³" },
+  { q:"Volume of 1 atom",                                       a:"1 × 10⁻²⁴ cm³",    match:["1e-24","10-24","1x10-24","1*10-24"],                     hint:"Extremely tiny — standard form with cm³" },
+  { q:"Diameter of an atom (assumed sphere)",                   a:"10⁻¹⁰ m",          match:["1e-10","10-10","0.1nm","100pm","1angstrom"],             hint:"Also known as 1 Ångström" },
+  { q:"Work done to lift an apple from waist to head height",   a:"1 J",               match:["1"],                                                     hint:"A very small amount of energy" },
+  { q:"Power dissipated by an electric kettle heating element", a:"2000 W",            match:["2000","2kw","2x103","2e3"],                              hint:"In kilowatts: about 2 kW" },
+  { q:"Volume of water in a swimming pool",                     a:"4 × 10² m³",        match:["400","4x102","4e2","4x10^2"],                            hint:"Standard form: 4 × 10? m³" },
+  { q:"Momentum of a lorry moving along a road",                a:"5 × 10⁵ N·s",       match:["5e5","500000","5x10^5","5x105"],                         hint:"Standard form: 5 × 10? N·s" },
+  { q:"Volume of an adult person",                              a:"0.1 m³",            match:["0.1","1e-1"],                                            hint:"Roughly the water you'd displace" },
+  { q:"Height of an adult human being",                         a:"2 m",               match:["2"],                                                     hint:"Just under or about 6 feet" },
+  { q:"Mass of an adult human",                                 a:"70 kg",             match:["70"],                                                    hint:"Average adult body mass" },
+  { q:"Average running speed of an Olympic athlete",            a:"10 m/s",            match:["10"],                                                    hint:"100 m in about 10 seconds" },
+  { q:"Distance between the Earth and the Sun",                 a:"1.5 × 10¹¹ m",     match:["1.5e11","1.5x10^11","150e9","150000000000"],             hint:"About 150 million km" },
+  { q:"Mass of a hydrogen atom",                                a:"10⁻²⁷ kg",          match:["1e-27","10-27","1x10-27"],                               hint:"The lightest atom — standard form" },
+  { q:"Mass of a car",                                          a:"1000 kg",           match:["1000","1x103","1e3","1tonne"],                           hint:"About 1 tonne" },
+  { q:"Number of seconds in a day",                             a:"90 000 s",          match:["90000","9x104","9e4"],                                   hint:"Roughly 9 × 10? seconds" },
+  { q:"Number of seconds in a year",                            a:"3 × 10⁷ s",         match:["3e7","30000000","3x10^7","3x107"],                       hint:"π × 10⁷ is a useful approximation" },
+  { q:"Speed of sound in air",                                  a:"300 m/s",           match:["300","330","340"],                                       hint:"Roughly 300–340 m/s at room temperature" },
+  { q:"Power of a light bulb",                                  a:"60 W",              match:["60"],                                                    hint:"A standard incandescent bulb" },
+  { q:"Atmospheric pressure",                                   a:"1 × 10⁵ Pa",        match:["1e5","100000","10^5","1x10^5","101325"],                 hint:"About 100 000 Pa at sea level" },
+  { q:"Volume of a football",                                   a:"6000 cm³",          match:["6000","6x103","6e3","6l","6litres","6liters"],           hint:"Roughly 6 litres = 6000 cm³" },
+  { q:"Mass of a raindrop",                                     a:"10⁻⁵ kg",           match:["1e-5","10-5","0.00001","50mg"],                         hint:"About 50 mg — give answer in kg" },
+  { q:"Young's modulus of copper",                              a:"1.2 × 10¹¹ Pa",     match:["1.2e11","1.2x10^11","120gpa","1.2x10^11"],              hint:"Stiffness of copper — very large number in Pa" },
+  { q:"Temperature of a hot oven",                              a:"200–230 °C",        match:["200","220","230","200-230","200to230"],                  hint:"Standard baking temperature" },
+];
+
+function normalize(s) {
+  return s.toString().toLowerCase()
+    .replace(/\s+/g,'')
+    .replace(/[×✕]/g,'x')
+    .replace(/[\u207B\u2212]/g,'-')
+    .replace(/\u00b9/g,'1').replace(/\u00b2/g,'2').replace(/\u00b3/g,'3')
+    .replace(/[\u2074]/g,'4').replace(/[\u2075]/g,'5').replace(/[\u2076]/g,'6')
+    .replace(/[\u2077]/g,'7').replace(/[\u2078]/g,'8').replace(/[\u2079]/g,'9').replace(/[\u2070]/g,'0')
+    .replace(/\^/g,'')
+    .replace(/[°℃]/g,'c')
+    .replace(/[·•\u00b7]/g,'')
+    .replace(/,/g,'')
+    .replace(/[³²¹⁰]/g,'');
+}
+
+function isCorrect(userInput, card) {
+  const u = normalize(userInput);
+  if (!u) return false;
+  return card.match.some(m => {
+    const nm = normalize(m);
+    return nm === u || u === nm || u.includes(nm) || nm.includes(u);
+  });
+}
+
+let deck, idx, correct, wrong, missed, answered;
+
+function shuffle(arr) {
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function init() {
+  deck=shuffle(cards); idx=0; correct=0; wrong=0; missed=[]; answered=false;
+  loadCard();
+}
+
+function loadCard() {
+  answered=false;
+  const total=deck.length, c=deck[idx];
+  document.getElementById('val-progress').textContent=`${idx+1}/${total}`;
+  document.getElementById('val-correct').textContent=correct;
+  document.getElementById('val-wrong').textContent=wrong;
+  document.getElementById('progress-fill').style.width=`${(idx/total)*100}%`;
+
+  const cardEl=document.getElementById('card');
+  cardEl.className='card';
+  document.getElementById('card-tag').textContent=`Estimation #${idx+1}`;
+  document.getElementById('question-text').textContent=c.q;
+
+  const inp=document.getElementById('answer-input');
+  inp.value=''; inp.disabled=false; inp.placeholder='Type your answer…'; inp.className='answer-input';
+  setTimeout(()=>inp.focus(),50);
+  document.getElementById('btn-submit').disabled=false;
+
+  document.getElementById('result-area').classList.remove('visible');
+  document.getElementById('result-banner').textContent='';
+  document.getElementById('your-answer-row').style.display='none';
+  document.getElementById('correct-row').style.display='none';
+
+  const ht=document.getElementById('hint-text');
+  ht.classList.remove('visible'); ht.textContent=c.hint;
+  document.getElementById('hint-toggle').textContent='show hint';
+
+  document.getElementById('btn-next').classList.remove('visible');
+  document.getElementById('btn-skip').style.display='';
+}
+
+function toggleHint() {
+  const ht=document.getElementById('hint-text'), tog=document.getElementById('hint-toggle');
+  ht.classList.toggle('visible');
+  tog.textContent=ht.classList.contains('visible')?'hide hint':'show hint';
+}
+
+function checkAnswer() {
+  if(answered) return;
+  const inp=document.getElementById('answer-input');
+  const userVal=inp.value.trim();
+  if(!userVal){
+    inp.classList.add('shake');
+    inp.addEventListener('animationend',()=>inp.classList.remove('shake'),{once:true});
+    inp.focus(); return;
+  }
+  answered=true;
+  const c=deck[idx];
+  const ok=isCorrect(userVal,c);
+
+  inp.disabled=true;
+  document.getElementById('btn-submit').disabled=true;
+  document.getElementById('btn-skip').style.display='none';
+  document.getElementById('btn-next').classList.add('visible');
+
+  const cardEl=document.getElementById('card');
+  const banner=document.getElementById('result-banner');
+  document.getElementById('result-area').classList.add('visible');
+
+  if(ok){
+    correct++;
+    cardEl.classList.add('state-correct');
+    banner.className='result-banner correct';
+    banner.innerHTML=`<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8l3.5 3.5L13 4.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg> Correct!`;
+    document.getElementById('your-answer-row').style.display='none';
+    document.getElementById('correct-row').style.display='none';
+  } else {
+    wrong++; missed.push(c);
+    cardEl.classList.add('state-wrong');
+    banner.className='result-banner wrong';
+    banner.innerHTML=`<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg> Not quite!`;
+    document.getElementById('your-val').textContent=userVal;
+    document.getElementById('your-answer-row').style.display='flex';
+    document.getElementById('correct-val').textContent=c.a;
+    document.getElementById('correct-row').style.display='flex';
+  }
+  document.getElementById('val-correct').textContent=correct;
+  document.getElementById('val-wrong').textContent=wrong;
+}
+
+function nextCard() {
+  idx++;
+  if(idx>=deck.length){showFinal();return;}
+  const cardEl=document.getElementById('card');
+  cardEl.classList.add('animating');
+  setTimeout(()=>{cardEl.classList.remove('animating');loadCard();},450);
+}
+
+function skipCard() {
+  if(answered) return;
+  deck.push(deck[idx]);
+  const cardEl=document.getElementById('card');
+  cardEl.classList.add('animating');
+  setTimeout(()=>{
+    cardEl.classList.remove('animating');
+    idx++;
+    if(idx>=deck.length) showFinal(); else loadCard();
+  },450);
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'){
+    if(!answered) checkAnswer();
+    else if(document.getElementById('btn-next').classList.contains('visible')) nextCard();
+  }
+});
+
+function showFinal() {
+  document.getElementById('quiz-section').style.display='none';
+  document.getElementById('final-screen').classList.add('active');
+  const pct=Math.round((correct/cards.length)*100);
+  document.getElementById('final-pct').textContent=`${pct}%`;
+  document.getElementById('final-tally').textContent=`${correct} correct · ${wrong} missed out of ${cards.length}`;
+  const msgs=['Keep going — repetition is the key.','Good start. More drills needed.','Solid foundation. Keep revising.','Strong performance. Almost there.',"Flawless. You're exam-ready."];
+  document.getElementById('final-message').textContent=msgs[pct>=100?4:pct>=80?3:pct>=60?2:pct>=40?1:0];
+  if(missed.length>0){
+    const listEl=document.getElementById('missed-list');
+    listEl.innerHTML=`<div class="missed-title">Review these (${missed.length} missed)</div>`;
+    missed.forEach(c=>{
+      const item=document.createElement('div');
+      item.className='missed-item';
+      item.innerHTML=`<span class="missed-q">${c.q}</span><span class="missed-a">${c.a}</span>`;
+      listEl.appendChild(item);
+    });
+  }
+}
+
+function restart() {
+  document.getElementById('quiz-section').style.display='block';
+  document.getElementById('final-screen').classList.remove('active');
+  document.getElementById('missed-list').innerHTML='';
+  init();
+}
+
+init();
+</script>
+</body>
+</html>
